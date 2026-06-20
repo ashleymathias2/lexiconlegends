@@ -121,8 +121,17 @@ namespace LexiconLegends.Grid
         // Selection / preview
         // ---------------------------------------------------------------
 
+        private bool _inputEnabled = true;
+
+        public void SetInputEnabled(bool enabled)
+        {
+            _inputEnabled = enabled;
+        }
+
         private void OnTileClicked(TileView tile)
         {
+            if (!_inputEnabled) return;
+
             if (tile.IsSelected)
             {
                 tile.SetSelected(false);
@@ -163,6 +172,7 @@ namespace LexiconLegends.Grid
 
         public void Reshuffle()
         {
+            if (!_inputEnabled) return;
             ClearSelection();
 
             var letters = new List<char>();
@@ -186,6 +196,8 @@ namespace LexiconLegends.Grid
 
         public void Confirm()
         {
+            if (!_inputEnabled) return;
+
             if (_selectionOrder.Count < _config.minWordLength)
             {
                 SetFeedback($"Words need at least {_config.minWordLength} letters.");
