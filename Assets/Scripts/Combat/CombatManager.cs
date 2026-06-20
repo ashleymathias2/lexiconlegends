@@ -6,16 +6,17 @@ using UnityEngine;
 namespace LexiconLegends.Combat
 {
     /// <summary>
-    /// GDD Section 7: player/enemy HP, the Aggression Meter, and enemy attacks. Subscribes
-    /// to WordGridManager.SpellCast (Stage 3) and applies every effect — base damage always
-    /// applies; Restoration/Burn/Stagger layer their extra effect on top, per Section 6's
-    /// "Effect" column.
+    /// Player/enemy HP and the enemy approach timer. Per project direction, enemy proximity
+    /// is driven by a real-time timer (not the GDD Section 7 Aggression Meter): the enemy
+    /// continuously closes in regardless of word pace, and reaching the player is an
+    /// instant loss. Subscribes to WordGridManager.SpellCast (Stage 3) and applies every
+    /// effect — base damage always applies; Restoration/Burn/Stagger layer their extra
+    /// effect on top, per Section 6's "Effect" column.
     /// </summary>
     public class CombatManager : MonoBehaviour
     {
         private CombatConfig _config;
-        private System.Random _rng;
-        private AggressionMeter _meter;
+        private EnemyApproachTimer _timer;
         private readonly List<BurnEffect> _activeBurns = new List<BurnEffect>();
 
         public float PlayerHP { get; private set; }
@@ -26,15 +27,13 @@ namespace LexiconLegends.Combat
         public event Action<float, float> PlayerHPChanged;   // (current, max)
         public event Action<float, float> EnemyHPChanged;    // (current, max)
         public event Action<EnemyStage> EnemyStageChanged;
-        public event Action<float> EnemyAttacked;            // damage dealt to player
-        public event Action PlayerDefeated;
+        public event Action PlayerDefeated; // enemy reached the player (timer expired)
         public event Action EnemyDefeated;
 
         public void Init(CombatConfig config)
         {
             _config = config;
-            _rng = new System.Random();
-            _meter = new AggressionMeter(config);
+            _timer = new EnemyApproachTimer(config);
 
             PlayerHP = config.playerMaxHP;
             EnemyHP = config.enemyMaxHP;
@@ -47,7 +46,21 @@ namespace LexiconLegends.Combat
             EnemyStageChanged?.Invoke(CurrentEnemyStage);
         }
 
-        /// <summary>Call once per confirmed word (a "turn"): ticks burns, applies the cast's effect, advances the Aggression Meter.</summary>
+        private void Update()
+        {
+            if (_timer == null || IsGameOver) return;
+
+            _timer.Tick(Time.deltaTime);
+            SetEnemyStage(_timer.GetStage());
+
+            if (_timer.HasReachedPlayer)
+            {
+                IsGameOver = true;
+                PlayerDefeated?.Invoke();
+            }
+        }
+
+        /// <summary>Call once per confirmed word (a "turn"): ticks burns, applies the cast's effect.</summary>
         public void OnSpellCast(SpellCastResult result)
         {
             if (IsGameOver) return;
@@ -56,9 +69,6 @@ namespace LexiconLegends.Combat
             if (IsGameOver) return; // a burn tick could have finished the enemy.
 
             ApplyCastEffect(result);
-            if (IsGameOver) return; // the cast's own damage could have finished the enemy.
-
-            AdvanceAggressionMeter(result);
         }
 
         private void TickBurns()
@@ -86,35 +96,10 @@ namespace LexiconLegends.Combat
                 case SpellType.Burn:
                     _activeBurns.Add(new BurnEffect(result.BurnTickDamage, result.BurnDurationTurns));
                     break;
-                // Stagger's extra effect (meter pushback) is applied in AdvanceAggressionMeter.
-            }
-        }
-
-        private void AdvanceAggressionMeter(SpellCastResult result)
-        {
-            bool isStagger = result.SpellType == SpellType.Stagger;
-            bool thresholdReached = _meter.AddFill(result.Word.Length, isStagger);
-
-            if (thresholdReached)
-            {
-                float damage = _config.RollEnemyHitDamage(_rng);
-                PlayerHP = Mathf.Max(0f, PlayerHP - damage);
-                PlayerHPChanged?.Invoke(PlayerHP, _config.playerMaxHP);
-                EnemyAttacked?.Invoke(damage);
-
-                _meter.Reset();
-                SetEnemyStage(EnemyStage.Neutral);
-
-                if (PlayerHP <= 0f)
-                {
-                    IsGameOver = true;
-                    PlayerDefeated?.Invoke();
-                    return;
-                }
-            }
-            else
-            {
-                SetEnemyStage(_meter.GetStage());
+                case SpellType.Stagger:
+                    _timer.ApplyStaggerBonus();
+                    SetEnemyStage(_timer.GetStage());
+                    break;
             }
         }
 
