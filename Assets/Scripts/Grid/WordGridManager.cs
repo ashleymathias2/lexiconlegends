@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
+using LexiconLegends.Combat;
 using LexiconLegends.Config;
 using LexiconLegends.Dictionary;
 using LexiconLegends.Spawn;
@@ -10,18 +12,20 @@ namespace LexiconLegends.Grid
 {
     /// <summary>
     /// Word grid: free-tile-selection input, word preview, the destroy + gravity + refill
-    /// loop (Section 4), and the full Section 5 letter spawn system — weighted distribution,
-    /// vowel balance, legendary cooldown, seed-word initial board generation, large-word
-    /// reward, and board playability validation via the Section 9 signature approach.
+    /// loop (Section 4), the full Section 5 letter spawn system, and (Stage 3) the Section 6
+    /// damage/spell resolution per confirmed word. Combat application (HP, enemy) arrives in
+    /// Stage 4 — for now SpellCast fires the computed breakdown for display/testing.
     /// </summary>
     public class WordGridManager : MonoBehaviour
     {
         private GridConfig _config;
         private LetterSpawnConfig _spawnConfig;
+        private DamageConfig _damageConfig;
         private WordDictionary _dictionary;
         private System.Random _rng;
         private LetterSpawner _spawner;
         private SeedWordSelector _seedSelector;
+        private CombatResolver _combatResolver;
 
         private TileView[,] _tiles;
         private readonly List<TileView> _selectionOrder = new List<TileView>();
@@ -30,11 +34,15 @@ namespace LexiconLegends.Grid
         private TextMeshProUGUI _previewLabel;
         private TextMeshProUGUI _feedbackLabel;
 
-        public void Init(GridConfig config, LetterSpawnConfig spawnConfig, WordDictionary dictionary,
-            TileView[,] tiles, TextMeshProUGUI previewLabel, TextMeshProUGUI feedbackLabel)
+        /// <summary>Fired after a word is confirmed and destroyed, with its full damage/spell breakdown.</summary>
+        public event Action<SpellCastResult> SpellCast;
+
+        public void Init(GridConfig config, LetterSpawnConfig spawnConfig, DamageConfig damageConfig,
+            WordDictionary dictionary, TileView[,] tiles, TextMeshProUGUI previewLabel, TextMeshProUGUI feedbackLabel)
         {
             _config = config;
             _spawnConfig = spawnConfig;
+            _damageConfig = damageConfig;
             _dictionary = dictionary;
             _tiles = tiles;
             _previewLabel = previewLabel;
@@ -42,6 +50,7 @@ namespace LexiconLegends.Grid
             _rng = new System.Random();
             _spawner = new LetterSpawner(_spawnConfig, _rng);
             _seedSelector = new SeedWordSelector(_spawnConfig, _dictionary, _rng);
+            _combatResolver = new CombatResolver(_damageConfig);
 
             for (int r = 0; r < _config.rows; r++)
             for (int c = 0; c < _config.columns; c++)
@@ -205,8 +214,23 @@ namespace LexiconLegends.Grid
             if (word.Length >= _spawnConfig.largeWordRewardLength)
                 _pendingRewardLetters += _spawnConfig.largeWordRewardLetterCount;
 
-            SetFeedback($"\"{word}\" confirmed!");
+            var result = _combatResolver.ResolveCast(word);
+            SetFeedback(FormatCastFeedback(result));
+            SpellCast?.Invoke(result);
+
             DestroySelectedAndRefill();
+        }
+
+        private static string FormatCastFeedback(SpellCastResult result)
+        {
+            string extra = result.SpellType switch
+            {
+                SpellType.Restoration => $" (+{result.HealAmount:F1} heal)",
+                SpellType.Burn => $" (+{result.BurnTickDamage:F1}/turn x{result.BurnDurationTurns})",
+                SpellType.Stagger => " (pushes Aggression Meter back)",
+                _ => string.Empty
+            };
+            return $"\"{result.Word}\" → {result.SpellType}: {result.Damage:F1} dmg{extra} | combo x{result.ComboMultiplier:F2} (streak {result.StreakAtCast})";
         }
 
         private void FlashSelection()
@@ -222,7 +246,6 @@ namespace LexiconLegends.Grid
             // Phase 1: gravity. Surviving letters per column settle to the bottom rows;
             // collect the (now-empty) top slots per column to be refilled in Phase 2.
             var emptySlots = new List<(int row, int col)>();
-            var columnSurvivors = new Dictionary<int, List<char>>();
 
             for (int c = 0; c < _config.columns; c++)
             {
@@ -242,8 +265,6 @@ namespace LexiconLegends.Grid
 
                 for (int r = 0; r < destroyedInColumn; r++)
                     emptySlots.Add((r, c));
-
-                columnSurvivors[c] = surviving;
             }
 
             // Phase 2: refill empty slots with retries against the board playability check.

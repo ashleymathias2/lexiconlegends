@@ -27,6 +27,7 @@ namespace LexiconLegends.Bootstrap
 
             var config = ScriptableObject.CreateInstance<GridConfig>();
             var spawnConfig = ScriptableObject.CreateInstance<LetterSpawnConfig>();
+            var damageConfig = ScriptableObject.CreateInstance<DamageConfig>();
 
             var dictionary = new WordDictionary();
             var dictAsset = Resources.Load<TextAsset>(DictionaryResourcePath);
@@ -36,7 +37,7 @@ namespace LexiconLegends.Bootstrap
             var canvas = BuildCanvas();
             BuildEnemyZonePlaceholder(canvas.transform);
             BuildHudStripPlaceholder(canvas.transform);
-            BuildGridZone(canvas.transform, config, spawnConfig, dictionary);
+            BuildGridZone(canvas.transform, config, spawnConfig, damageConfig, dictionary);
         }
 
         private static void EnsureEventSystem()
@@ -94,7 +95,8 @@ namespace LexiconLegends.Bootstrap
             StretchFull(label.rectTransform);
         }
 
-        private static void BuildGridZone(Transform canvasTransform, GridConfig config, LetterSpawnConfig spawnConfig, WordDictionary dictionary)
+        private static void BuildGridZone(Transform canvasTransform, GridConfig config, LetterSpawnConfig spawnConfig,
+            DamageConfig damageConfig, WordDictionary dictionary)
         {
             // GDD Section 2: Bottom zone, ~50-55% height. Fully functional in Stage 1.
             var zone = AddZone(canvasTransform, "GridZone", 0f, 0.525f, new Color(0.12f, 0.12f, 0.14f));
@@ -110,9 +112,9 @@ namespace LexiconLegends.Bootstrap
             var previewLabel = CreateLabel(zone, "—", 48, Color.white);
             previewLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
 
-            // Feedback row (validation messages).
-            var feedbackLabel = CreateLabel(zone, string.Empty, 26, new Color(1f, 0.8f, 0.4f));
-            feedbackLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 50;
+            // Feedback row (validation messages + cast breakdown).
+            var feedbackLabel = CreateLabel(zone, string.Empty, 24, new Color(1f, 0.8f, 0.4f));
+            feedbackLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 80;
 
             // Grid container.
             var gridGo = new GameObject("TileGrid", typeof(RectTransform));
@@ -141,7 +143,7 @@ namespace LexiconLegends.Bootstrap
             buttonsRowLayout.childForceExpandWidth = true;
 
             var manager = zone.gameObject.AddComponent<WordGridManager>();
-            manager.Init(config, spawnConfig, dictionary, tiles, previewLabel, feedbackLabel);
+            manager.Init(config, spawnConfig, damageConfig, dictionary, tiles, previewLabel, feedbackLabel);
 
             BuildButton(buttonsRowGo.transform, "Confirm", new Color(0.25f, 0.6f, 0.3f), manager.Confirm);
             BuildButton(buttonsRowGo.transform, "Clear", new Color(0.5f, 0.5f, 0.5f), manager.ClearSelection);
