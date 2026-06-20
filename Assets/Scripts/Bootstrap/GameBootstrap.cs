@@ -21,7 +21,7 @@ namespace LexiconLegends.Bootstrap
     /// </summary>
     public static class GameBootstrap
     {
-        private const string DictionaryResourcePath = "Dictionary/placeholder_words";
+        private const string DictionaryResourcePath = "Dictionary/dictionary";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
