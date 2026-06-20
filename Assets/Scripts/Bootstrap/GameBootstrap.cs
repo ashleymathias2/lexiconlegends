@@ -28,10 +28,13 @@ namespace LexiconLegends.Bootstrap
         {
             EnsureEventSystem();
 
-            var config = ScriptableObject.CreateInstance<GridConfig>();
-            var spawnConfig = ScriptableObject.CreateInstance<LetterSpawnConfig>();
-            var damageConfig = ScriptableObject.CreateInstance<DamageConfig>();
-            var combatConfig = ScriptableObject.CreateInstance<CombatConfig>();
+            // Loaded from Assets/Resources/Config/*.asset so every tunable number is visible
+            // and editable in the Inspector — select the asset to tweak values, including
+            // live edits while in Play mode (it's the same object instance the game is using).
+            var config = LoadOrCreateConfig<GridConfig>("Config/GridConfig");
+            var spawnConfig = LoadOrCreateConfig<LetterSpawnConfig>("Config/LetterSpawnConfig");
+            var damageConfig = LoadOrCreateConfig<DamageConfig>("Config/DamageConfig");
+            var combatConfig = LoadOrCreateConfig<CombatConfig>("Config/CombatConfig");
 
             var dictionary = new WordDictionary();
             var dictAsset = Resources.Load<TextAsset>(DictionaryResourcePath);
@@ -49,6 +52,15 @@ namespace LexiconLegends.Bootstrap
             BuildEndOfRunFlow(canvas.transform, combatManager, manager, combatConfig, livesLabel);
 
             manager.SpellCast += combatManager.OnSpellCast;
+        }
+
+        private static T LoadOrCreateConfig<T>(string resourcePath) where T : ScriptableObject
+        {
+            var loaded = Resources.Load<T>(resourcePath);
+            if (loaded != null) return loaded;
+
+            Debug.LogWarning($"Lexicon Legends: no config asset found at Resources/{resourcePath}; using uneditable in-memory defaults for {typeof(T).Name}.");
+            return ScriptableObject.CreateInstance<T>();
         }
 
         private static void EnsureEventSystem()
@@ -135,8 +147,11 @@ namespace LexiconLegends.Bootstrap
             emojiRect.anchorMax = new Vector2(1f, 1.6f);
             emojiRect.offsetMin = emojiRect.offsetMax = Vector2.zero;
 
-            // Stage offsets: fraction down the zone's vertical anchor, far -> adjacent to the player.
-            float[] stageAnchorY = { 0.78f, 0.62f, 0.46f, 0.30f };
+            // Continuous approach: anchor Y lerps every frame from far (0.78) to adjacent (0.30)
+            // as the real-time approach timer progresses, so movement is visibly gradual rather
+            // than only jumping at the 3 discrete emoji-stage breakpoints.
+            const float farAnchorY = 0.78f;
+            const float adjacentAnchorY = 0.30f;
 
             combatManager.EnemyHPChanged += (current, max) =>
             {
@@ -145,13 +160,16 @@ namespace LexiconLegends.Bootstrap
                 enemyHpLabel.text = $"Enemy HP: {Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)}";
             };
 
-            combatManager.EnemyStageChanged += stage =>
+            combatManager.EnemyApproachProgressChanged += progress =>
             {
-                int stageIndex = (int)stage;
-                var anchor = new Vector2(0.5f, stageAnchorY[Mathf.Clamp(stageIndex, 0, stageAnchorY.Length - 1)]);
+                float anchorY = Mathf.Lerp(farAnchorY, adjacentAnchorY, progress);
+                var anchor = new Vector2(0.5f, anchorY);
                 enemyBodyRect.anchorMin = anchor;
                 enemyBodyRect.anchorMax = anchor;
+            };
 
+            combatManager.EnemyStageChanged += stage =>
+            {
                 emojiLabel.text = stage switch
                 {
                     EnemyStage.Stage1 => "😠 ANGRY",

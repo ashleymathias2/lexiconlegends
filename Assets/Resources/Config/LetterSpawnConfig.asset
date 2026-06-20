@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83b63e493cde70b428c8804017197249, type: 3}
+  m_Name: LetterSpawnConfig
+  m_EditorClassIdentifier:
+  vowelLetters: AEIOU
+  commonLetters: RTLNS
+  mediumLetters: DGHMP
+  rareLetters: BCFWY
+  legendaryLetters: JQXZ
+  baseVowelChance: 0.35
+  baseCommonChance: 0.3
+  baseMediumChance: 0.2
+  baseRareChance: 0.1
+  baseLegendaryChance: 0.05
+  minVowelsOnBoard: 6
+  maxVowelsOnBoard: 9
+  legendaryCooldownSpawns: 6
+  largeWordRewardLength: 6
+  largeWordRewardLetterCount: 1
+  currentStage: 0
+  earlyVowelChance: 0.4
+  earlyLegendaryChance: 0.03
+  midVowelChance: 0.35
+  midLegendaryChance: 0.05
+  lateVowelChance: 0.3
+  lateLegendaryChance: 0.07
+  seedWeight4Letters: 0.5
+  seedWeight5Letters: 0.3
+  seedWeight6Letters: 0.15
+  seedWeight7PlusLetters: 0.05
+  minValidWordsAfterRefill: 3
+  maxRefillRetries: 5

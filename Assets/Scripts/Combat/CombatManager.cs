@@ -27,6 +27,7 @@ namespace LexiconLegends.Combat
         public event Action<float, float> PlayerHPChanged;   // (current, max)
         public event Action<float, float> EnemyHPChanged;    // (current, max)
         public event Action<EnemyStage> EnemyStageChanged;
+        public event Action<float> EnemyApproachProgressChanged; // 0 (far) -> 1 (reached player), fired every frame
         public event Action PlayerDefeated; // enemy reached the player (timer expired)
         public event Action EnemyDefeated;
 
@@ -44,6 +45,7 @@ namespace LexiconLegends.Combat
             PlayerHPChanged?.Invoke(PlayerHP, config.playerMaxHP);
             EnemyHPChanged?.Invoke(EnemyHP, config.enemyMaxHP);
             EnemyStageChanged?.Invoke(CurrentEnemyStage);
+            EnemyApproachProgressChanged?.Invoke(0f);
         }
 
         private void Update()
@@ -52,6 +54,11 @@ namespace LexiconLegends.Combat
 
             _timer.Tick(Time.deltaTime);
             SetEnemyStage(_timer.GetStage());
+
+            float progress = _config.timeToReachPlayerSeconds <= 0f
+                ? 1f
+                : Mathf.Clamp01(_timer.Elapsed / _config.timeToReachPlayerSeconds);
+            EnemyApproachProgressChanged?.Invoke(progress);
 
             if (_timer.HasReachedPlayer)
             {
@@ -99,6 +106,10 @@ namespace LexiconLegends.Combat
                 case SpellType.Stagger:
                     _timer.ApplyStaggerBonus();
                     SetEnemyStage(_timer.GetStage());
+                    float progress = _config.timeToReachPlayerSeconds <= 0f
+                        ? 1f
+                        : Mathf.Clamp01(_timer.Elapsed / _config.timeToReachPlayerSeconds);
+                    EnemyApproachProgressChanged?.Invoke(progress);
                     break;
             }
         }

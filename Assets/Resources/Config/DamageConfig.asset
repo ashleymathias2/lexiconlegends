@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77243d9ee6936cb4eb31f175ffb5b612, type: 3}
+  m_Name: DamageConfig
+  m_EditorClassIdentifier:
+  lengthMultipliers:
+  - 1
+  - 1.3
+  - 1.7
+  - 2.2
+  - 3
+  - 4
+  commonLetters: EART
+  commonWeight: 1
+  uncommonLetters: DLNS
+  uncommonWeight: 1.2
+  rareLetters: CMPW
+  rareWeight: 1.5
+  epicLetters: BFVY
+  epicWeight: 2
+  legendaryLetters: JQXZ
+  legendaryWeight: 3
+  defaultWeightForUnlistedLetters: 1
+  comboMultiplierLow: 1
+  comboMultiplierMid: 1.15
+  comboMultiplierHigh: 1.3
+  streakResetSeconds: 4
+  vowelCategoryThreshold: 0.6
+  consonantCategoryThreshold: 0.6
+  vowels: AEIOU
+  restorationHealRatio: 0.5
+  burnDurationTurns: 3
+  burnTickDamageRatio: 0.15
