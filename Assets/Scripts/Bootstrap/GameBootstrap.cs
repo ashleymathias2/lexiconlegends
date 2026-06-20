@@ -2,6 +2,7 @@ using LexiconLegends.Combat;
 using LexiconLegends.Config;
 using LexiconLegends.Dictionary;
 using LexiconLegends.Grid;
+using LexiconLegends.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -13,8 +14,8 @@ namespace LexiconLegends.Bootstrap
 {
     /// <summary>
     /// Builds the playtest scene entirely at runtime: the three-zone portrait layout from
-    /// GDD Section 2 — a functional enemy zone (Section 7 combat/Aggression Meter), a
-    /// minimal HUD strip (full HUD arrives in Stage 5), and the fully functional word grid
+    /// GDD Section 2 — a functional enemy zone (combat presentation), a full HUD strip
+    /// (player HP, combo streak, lives, pause, score), and the fully functional word grid
     /// zone. This means pressing Play in any scene is enough to test — no manual
     /// prefab/scene wiring required.
     /// </summary>
@@ -43,9 +44,9 @@ namespace LexiconLegends.Bootstrap
 
             var canvas = BuildCanvas();
             BuildEnemyZone(canvas.transform, combatManager);
-            BuildHudStrip(canvas.transform, combatManager);
             var manager = BuildGridZone(canvas.transform, config, spawnConfig, damageConfig, dictionary);
-            BuildGameOverOverlay(canvas.transform, combatManager, manager);
+            var livesLabel = BuildHudStrip(canvas.transform, combatManager, manager, damageConfig);
+            BuildEndOfRunFlow(canvas.transform, combatManager, manager, combatConfig, livesLabel);
 
             manager.SpellCast += combatManager.OnSpellCast;
         }
@@ -120,7 +121,7 @@ namespace LexiconLegends.Bootstrap
             var enemyHpLabel = CreateLabel(hpBarBg.transform, "Enemy HP", 22, Color.white);
             StretchFull(enemyHpLabel.rectTransform);
 
-            // Enemy body: moves down within the zone as the Aggression Meter escalates.
+            // Enemy body: moves down within the zone as the approach timer escalates.
             var enemyBody = new GameObject("EnemyBody", typeof(RectTransform));
             enemyBody.transform.SetParent(zone, false);
             var enemyBodyRect = enemyBody.GetComponent<RectTransform>();
@@ -162,18 +163,84 @@ namespace LexiconLegends.Bootstrap
         }
 
         // ---------------------------------------------------------------
-        // HUD strip (Section 2 middle zone) — minimal until Stage 5
+        // HUD strip (Section 2 middle zone): player HP, combo streak,
+        // lives, pause, level/score.
         // ---------------------------------------------------------------
 
-        private static void BuildHudStrip(Transform canvasTransform, CombatManager combatManager)
+        private static TextMeshProUGUI BuildHudStrip(Transform canvasTransform, CombatManager combatManager,
+            WordGridManager gridManager, DamageConfig damageConfig)
         {
-            // GDD Section 2: Middle zone, ~10% height. Combo/lives/score arrive in Stage 5.
+            // GDD Section 2: Middle zone, ~10% height.
             var zone = AddZone(canvasTransform, "HudStrip", 0.525f, 0.625f, new Color(0.2f, 0.2f, 0.25f));
-            var label = CreateLabel(zone, "Player HP: 100 / 100", 30, Color.white);
-            StretchFull(label.rectTransform);
+
+            var layout = zone.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.spacing = 8f;
+            layout.padding = new RectOffset(12, 12, 6, 6);
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+
+            // Player HP: compact bar + numeric label, same pattern as the enemy HP bar.
+            var hpContainer = new GameObject("PlayerHp", typeof(RectTransform));
+            hpContainer.transform.SetParent(zone, false);
+            hpContainer.AddComponent<LayoutElement>().flexibleWidth = 1.4f;
+            hpContainer.AddComponent<Image>().color = new Color(0.1f, 0.05f, 0.05f);
+
+            var hpFillGo = new GameObject("Fill", typeof(RectTransform));
+            hpFillGo.transform.SetParent(hpContainer.transform, false);
+            var hpFillRect = hpFillGo.GetComponent<RectTransform>();
+            hpFillRect.anchorMin = Vector2.zero;
+            hpFillRect.anchorMax = Vector2.one;
+            hpFillRect.offsetMin = hpFillRect.offsetMax = Vector2.zero;
+            hpFillRect.pivot = new Vector2(0f, 0.5f);
+            hpFillGo.AddComponent<Image>().color = new Color(0.2f, 0.75f, 0.3f);
+
+            var hpLabel = CreateLabel(hpContainer.transform, "HP 100/100", 22, Color.white);
+            StretchFull(hpLabel.rectTransform);
 
             combatManager.PlayerHPChanged += (current, max) =>
-                label.text = $"Player HP: {Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)}";
+            {
+                float ratio = max <= 0f ? 0f : Mathf.Clamp01(current / max);
+                hpFillRect.anchorMax = new Vector2(ratio, 1f);
+                hpLabel.text = $"HP {Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)}";
+            };
+
+            // Combo streak.
+            var comboLabel = CreateLabel(zone, "Streak: 0", 22, Color.white);
+            comboLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            var comboDisplay = comboLabel.gameObject.AddComponent<ComboStreakDisplay>();
+            comboDisplay.Init(comboLabel, damageConfig.streakResetSeconds);
+            gridManager.SpellCast += result => comboDisplay.RegisterStreak(result.StreakAtCast);
+
+            // Lives.
+            var livesLabel = CreateLabel(zone, string.Empty, 22, Color.white);
+            livesLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            // Level/score: score tracked as cumulative damage dealt to the current enemy.
+            var scoreLabel = CreateLabel(zone, "Score: 0  |  Lvl 1", 22, Color.white);
+            scoreLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1.2f;
+            combatManager.EnemyHPChanged += (current, max) =>
+                scoreLabel.text = $"Score: {Mathf.RoundToInt(max - current)}  |  Lvl 1";
+
+            // Pause.
+            var pauseButtonGo = new GameObject("PauseButton", typeof(RectTransform));
+            pauseButtonGo.transform.SetParent(zone, false);
+            pauseButtonGo.AddComponent<LayoutElement>().flexibleWidth = 0.7f;
+            pauseButtonGo.AddComponent<Image>().color = new Color(0.35f, 0.35f, 0.4f);
+            var pauseButton = pauseButtonGo.AddComponent<Button>();
+            var pauseLabel = CreateLabel(pauseButtonGo.transform, "Pause", 22, Color.white);
+            StretchFull(pauseLabel.rectTransform);
+
+            bool isPaused = false;
+            pauseButton.onClick.AddListener(() =>
+            {
+                isPaused = !isPaused;
+                Time.timeScale = isPaused ? 0f : 1f;
+                gridManager.SetInputEnabled(!isPaused);
+                pauseLabel.text = isPaused ? "Resume" : "Pause";
+            });
+
+            return livesLabel;
         }
 
         // ---------------------------------------------------------------
@@ -238,12 +305,19 @@ namespace LexiconLegends.Bootstrap
         }
 
         // ---------------------------------------------------------------
-        // Win / loss overlay
+        // End-of-run flow: win/loss overlay, plus a minimal lives counter
+        // (full lives economy — refill timers, IAP — is Section 8, out of scope).
+        // Losing to the enemy reaching the player costs a life and continues
+        // (fresh enemy HP and approach timer) until lives run out.
         // ---------------------------------------------------------------
 
-        private static void BuildGameOverOverlay(Transform canvasTransform, CombatManager combatManager, WordGridManager gridManager)
+        private static void BuildEndOfRunFlow(Transform canvasTransform, CombatManager combatManager,
+            WordGridManager gridManager, CombatConfig combatConfig, TextMeshProUGUI livesLabel)
         {
-            var overlayGo = new GameObject("GameOverOverlay", typeof(RectTransform));
+            int livesRemaining = combatConfig.startingLives;
+            livesLabel.text = $"Lives: {livesRemaining}";
+
+            var overlayGo = new GameObject("EndOfRunOverlay", typeof(RectTransform));
             overlayGo.transform.SetParent(canvasTransform, false);
             StretchFull(overlayGo.GetComponent<RectTransform>());
             overlayGo.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.75f);
@@ -254,29 +328,50 @@ namespace LexiconLegends.Bootstrap
             titleLabel.rectTransform.anchorMax = new Vector2(0.9f, 0.7f);
             titleLabel.rectTransform.offsetMin = titleLabel.rectTransform.offsetMax = Vector2.zero;
 
-            var restartButtonGo = new GameObject("RestartButton", typeof(RectTransform));
-            restartButtonGo.transform.SetParent(overlayGo.transform, false);
-            var restartRect = restartButtonGo.GetComponent<RectTransform>();
-            restartRect.anchorMin = new Vector2(0.3f, 0.42f);
-            restartRect.anchorMax = new Vector2(0.7f, 0.5f);
-            restartRect.offsetMin = restartRect.offsetMax = Vector2.zero;
-            restartButtonGo.AddComponent<Image>().color = new Color(0.3f, 0.5f, 0.3f);
-            var restartButton = restartButtonGo.AddComponent<Button>();
-            restartButton.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex));
-            var restartLabel = CreateLabel(restartButtonGo.transform, "Restart", 36, Color.white);
-            StretchFull(restartLabel.rectTransform);
+            var actionButtonGo = new GameObject("ActionButton", typeof(RectTransform));
+            actionButtonGo.transform.SetParent(overlayGo.transform, false);
+            var actionRect = actionButtonGo.GetComponent<RectTransform>();
+            actionRect.anchorMin = new Vector2(0.3f, 0.42f);
+            actionRect.anchorMax = new Vector2(0.7f, 0.5f);
+            actionRect.offsetMin = actionRect.offsetMax = Vector2.zero;
+            actionButtonGo.AddComponent<Image>().color = new Color(0.3f, 0.5f, 0.3f);
+            var actionButton = actionButtonGo.AddComponent<Button>();
+            var actionLabel = CreateLabel(actionButtonGo.transform, string.Empty, 36, Color.white);
+            StretchFull(actionLabel.rectTransform);
 
-            combatManager.EnemyDefeated += () =>
+            void ShowFinalOverlay(string title)
             {
                 gridManager.SetInputEnabled(false);
-                titleLabel.text = "You Win!";
+                titleLabel.text = title;
+                actionLabel.text = "Restart";
+                actionButton.onClick.RemoveAllListeners();
+                actionButton.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex));
                 overlayGo.SetActive(true);
-            };
+            }
+
+            void ShowContinueOverlay()
+            {
+                gridManager.SetInputEnabled(false);
+                titleLabel.text = $"The enemy reached you! Lives left: {livesRemaining}";
+                actionLabel.text = "Continue";
+                actionButton.onClick.RemoveAllListeners();
+                actionButton.onClick.AddListener(() =>
+                {
+                    overlayGo.SetActive(false);
+                    gridManager.SetInputEnabled(true);
+                    combatManager.Init(combatConfig);
+                });
+                overlayGo.SetActive(true);
+            }
+
+            combatManager.EnemyDefeated += () => ShowFinalOverlay("You Win!");
             combatManager.PlayerDefeated += () =>
             {
-                gridManager.SetInputEnabled(false);
-                titleLabel.text = "You Lose...";
-                overlayGo.SetActive(true);
+                livesRemaining--;
+                livesLabel.text = $"Lives: {livesRemaining}";
+
+                if (livesRemaining > 0) ShowContinueOverlay();
+                else ShowFinalOverlay("You Lose...");
             };
         }
 

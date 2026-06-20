@@ -16,6 +16,10 @@ namespace LexiconLegends.Config
         [Min(1f)] public float playerMaxHP = 100f;
         [Min(1f)] public float enemyMaxHP = 50f; // Per-level/enemy-type values arrive with the level system (Section 8, out of scope for now).
 
+        [Header("Lives (Section 2 HUD; full lives economy is Section 8, out of scope for now)")]
+        [Tooltip("Number of times the enemy can reach the player before the run ends for good.")]
+        [Min(0)] public int startingLives = 3;
+
         [Header("Enemy Approach Timer")]
         [Tooltip("Real-time seconds for the enemy to walk from starting distance to the player. Reaching the player is an instant loss.")]
         [Min(0.1f)] public float timeToReachPlayerSeconds = 60f;
