@@ -2,38 +2,46 @@ using System.Collections.Generic;
 using System.Text;
 using LexiconLegends.Config;
 using LexiconLegends.Dictionary;
+using LexiconLegends.Spawn;
 using TMPro;
 using UnityEngine;
 
 namespace LexiconLegends.Grid
 {
     /// <summary>
-    /// Stage 1 word grid: free-tile-selection input, word preview, and the
-    /// destroy + gravity + refill loop (GDD Sections 4 and 5).
-    /// Refill in this stage uses a uniform-random placeholder pool; the weighted
-    /// spawn distribution, vowel balance rule, and rare-letter cooldown arrive in Stage 2.
+    /// Word grid: free-tile-selection input, word preview, the destroy + gravity + refill
+    /// loop (Section 4), and the full Section 5 letter spawn system — weighted distribution,
+    /// vowel balance, legendary cooldown, seed-word initial board generation, large-word
+    /// reward, and board playability validation via the Section 9 signature approach.
     /// </summary>
     public class WordGridManager : MonoBehaviour
     {
         private GridConfig _config;
+        private LetterSpawnConfig _spawnConfig;
         private WordDictionary _dictionary;
         private System.Random _rng;
+        private LetterSpawner _spawner;
+        private SeedWordSelector _seedSelector;
 
         private TileView[,] _tiles;
         private readonly List<TileView> _selectionOrder = new List<TileView>();
+        private int _pendingRewardLetters;
 
         private TextMeshProUGUI _previewLabel;
         private TextMeshProUGUI _feedbackLabel;
 
-        public void Init(GridConfig config, WordDictionary dictionary, TileView[,] tiles,
-            TextMeshProUGUI previewLabel, TextMeshProUGUI feedbackLabel)
+        public void Init(GridConfig config, LetterSpawnConfig spawnConfig, WordDictionary dictionary,
+            TileView[,] tiles, TextMeshProUGUI previewLabel, TextMeshProUGUI feedbackLabel)
         {
             _config = config;
+            _spawnConfig = spawnConfig;
             _dictionary = dictionary;
             _tiles = tiles;
             _previewLabel = previewLabel;
             _feedbackLabel = feedbackLabel;
             _rng = new System.Random();
+            _spawner = new LetterSpawner(_spawnConfig, _rng);
+            _seedSelector = new SeedWordSelector(_spawnConfig, _dictionary, _rng);
 
             for (int r = 0; r < _config.rows; r++)
             for (int c = 0; c < _config.columns; c++)
@@ -43,18 +51,66 @@ namespace LexiconLegends.Grid
             UpdatePreview();
         }
 
+        // ---------------------------------------------------------------
+        // Initial board generation (Section 5, Steps 1-4)
+        // ---------------------------------------------------------------
+
         private void GenerateInitialBoard()
         {
-            for (int r = 0; r < _config.rows; r++)
-            for (int c = 0; c < _config.columns; c++)
-                _tiles[r, c].SetLetter(RandomPlaceholderLetter());
+            int attempts = 0;
+            bool valid;
+            do
+            {
+                PlaceSeedAndFillBoard();
+                valid = IsBoardValid();
+                attempts++;
+            } while (!valid && attempts < _spawnConfig.maxRefillRetries);
+
+            if (!valid)
+                Debug.LogWarning("Lexicon Legends: could not generate an initial board meeting the minimum valid-word count after retries; using last attempt.");
         }
 
-        private char RandomPlaceholderLetter()
+        private void PlaceSeedAndFillBoard()
         {
-            var pool = _config.placeholderRefillPool;
-            return pool[_rng.Next(pool.Length)];
+            int totalCells = _config.rows * _config.columns;
+            var allCells = new List<(int row, int col)>(totalCells);
+            for (int r = 0; r < _config.rows; r++)
+            for (int c = 0; c < _config.columns; c++)
+                allCells.Add((r, c));
+            Shuffle(allCells);
+
+            string seedWord = _seedSelector.SelectSeedWord(totalCells, _config.maxWordLength);
+
+            var remainingCells = new List<(int row, int col)>(allCells);
+            if (!string.IsNullOrEmpty(seedWord))
+            {
+                for (int i = 0; i < seedWord.Length; i++)
+                {
+                    var cell = remainingCells[0];
+                    remainingCells.RemoveAt(0);
+                    _tiles[cell.row, cell.col].SetLetter(seedWord[i]);
+                }
+            }
+
+            foreach (var cell in remainingCells)
+            {
+                char letter = _spawner.SpawnLetter(CountVowelsOnBoard());
+                _tiles[cell.row, cell.col].SetLetter(letter);
+            }
         }
+
+        private void Shuffle<T>(List<T> list)
+        {
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = _rng.Next(i + 1);
+                (list[i], list[j]) = (list[j], list[i]);
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Selection / preview
+        // ---------------------------------------------------------------
 
         private void OnTileClicked(TileView tile)
         {
@@ -105,12 +161,7 @@ namespace LexiconLegends.Grid
             for (int c = 0; c < _config.columns; c++)
                 letters.Add(_tiles[r, c].Letter);
 
-            // Fisher-Yates shuffle.
-            for (int i = letters.Count - 1; i > 0; i--)
-            {
-                int j = _rng.Next(i + 1);
-                (letters[i], letters[j]) = (letters[j], letters[i]);
-            }
+            Shuffle(letters);
 
             int idx = 0;
             for (int r = 0; r < _config.rows; r++)
@@ -119,6 +170,10 @@ namespace LexiconLegends.Grid
 
             SetFeedback("Board reshuffled.");
         }
+
+        // ---------------------------------------------------------------
+        // Confirm / destroy / gravity / refill
+        // ---------------------------------------------------------------
 
         public void Confirm()
         {
@@ -147,6 +202,9 @@ namespace LexiconLegends.Grid
                 return;
             }
 
+            if (word.Length >= _spawnConfig.largeWordRewardLength)
+                _pendingRewardLetters += _spawnConfig.largeWordRewardLetterCount;
+
             SetFeedback($"\"{word}\" confirmed!");
             DestroySelectedAndRefill();
         }
@@ -161,6 +219,11 @@ namespace LexiconLegends.Grid
             var destroyedTiles = new HashSet<TileView>(_selectionOrder);
             _selectionOrder.Clear();
 
+            // Phase 1: gravity. Surviving letters per column settle to the bottom rows;
+            // collect the (now-empty) top slots per column to be refilled in Phase 2.
+            var emptySlots = new List<(int row, int col)>();
+            var columnSurvivors = new Dictionary<int, List<char>>();
+
             for (int c = 0; c < _config.columns; c++)
             {
                 var surviving = new List<char>();
@@ -169,23 +232,76 @@ namespace LexiconLegends.Grid
                     var tile = _tiles[r, c];
                     if (!destroyedTiles.Contains(tile))
                         surviving.Add(tile.Letter);
+                    else
+                        tile.SetSelected(false);
                 }
 
                 int destroyedInColumn = _config.rows - surviving.Count;
-
-                // Tiles fall downward: surviving letters settle to the bottom rows,
-                // new letters refill the gap left at the top of the column.
-                for (int r = 0; r < destroyedInColumn; r++)
-                    _tiles[r, c].SetLetter(RandomPlaceholderLetter());
-
                 for (int r = 0; r < surviving.Count; r++)
                     _tiles[destroyedInColumn + r, c].SetLetter(surviving[r]);
 
-                foreach (var tile in destroyedTiles)
-                    if (tile.Col == c) tile.SetSelected(false);
+                for (int r = 0; r < destroyedInColumn; r++)
+                    emptySlots.Add((r, c));
+
+                columnSurvivors[c] = surviving;
             }
 
+            // Phase 2: refill empty slots with retries against the board playability check.
+            int attempts = 0;
+            bool valid;
+            do
+            {
+                FillEmptySlots(emptySlots);
+                valid = IsBoardValid();
+                attempts++;
+            } while (!valid && attempts < _spawnConfig.maxRefillRetries);
+
+            if (!valid)
+                Debug.LogWarning("Lexicon Legends: refill could not reach the minimum valid-word count after retries; using last attempt.");
+
             UpdatePreview();
+        }
+
+        private void FillEmptySlots(List<(int row, int col)> emptySlots)
+        {
+            int rewardLettersToUse = _pendingRewardLetters;
+            _pendingRewardLetters = 0;
+
+            foreach (var cell in emptySlots)
+            {
+                char letter;
+                if (rewardLettersToUse > 0)
+                {
+                    letter = _spawner.SpawnGuaranteedRareLetter();
+                    rewardLettersToUse--;
+                }
+                else
+                {
+                    letter = _spawner.SpawnLetter(CountVowelsOnBoard());
+                }
+                _tiles[cell.row, cell.col].SetLetter(letter);
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Board state helpers
+        // ---------------------------------------------------------------
+
+        private int CountVowelsOnBoard()
+        {
+            int count = 0;
+            string vowels = _spawnConfig.vowelLetters;
+            for (int r = 0; r < _config.rows; r++)
+            for (int c = 0; c < _config.columns; c++)
+                if (vowels.IndexOf(_tiles[r, c].Letter) >= 0) count++;
+            return count;
+        }
+
+        private bool IsBoardValid()
+        {
+            var signature = BoardValidator.BuildSignature(_tiles, _config.rows, _config.columns);
+            return BoardValidator.HasMinimumValidWords(signature, _dictionary, _config.minWordLength,
+                _config.maxWordLength, _spawnConfig.minValidWordsAfterRefill);
         }
     }
 }
