@@ -46,7 +46,7 @@ namespace LexiconLegends.Bootstrap
             combatManager.Init(combatConfig);
 
             var canvas = BuildCanvas();
-            BuildEnemyZone(canvas.transform, combatManager);
+            BuildEnemyZone(canvas.transform, combatManager, combatConfig);
             var manager = BuildGridZone(canvas.transform, config, spawnConfig, damageConfig, dictionary);
             var livesLabel = BuildHudStrip(canvas.transform, combatManager, manager, damageConfig);
             BuildEndOfRunFlow(canvas.transform, combatManager, manager, combatConfig, livesLabel);
@@ -106,7 +106,7 @@ namespace LexiconLegends.Bootstrap
         // Enemy zone (Section 2 top zone, Section 7 combat presentation)
         // ---------------------------------------------------------------
 
-        private static void BuildEnemyZone(Transform canvasTransform, CombatManager combatManager)
+        private static void BuildEnemyZone(Transform canvasTransform, CombatManager combatManager, CombatConfig combatConfig)
         {
             // GDD Section 2: Top zone, ~35-40% height.
             var zone = AddZone(canvasTransform, "EnemyZone", 0.625f, 1f, new Color(0.45f, 0.18f, 0.18f));
@@ -138,7 +138,7 @@ namespace LexiconLegends.Bootstrap
             enemyBody.transform.SetParent(zone, false);
             var enemyBodyRect = enemyBody.GetComponent<RectTransform>();
             enemyBodyRect.sizeDelta = new Vector2(220, 220);
-            enemyBodyRect.anchorMin = enemyBodyRect.anchorMax = new Vector2(0.5f, 0.78f);
+            enemyBodyRect.anchorMin = enemyBodyRect.anchorMax = new Vector2(0.5f, combatConfig.enemyFarAnchorY);
             enemyBody.AddComponent<Image>().color = new Color(0.6f, 0.1f, 0.6f);
 
             var emojiLabel = CreateLabel(enemyBody.transform, string.Empty, 30, Color.white);
@@ -147,12 +147,11 @@ namespace LexiconLegends.Bootstrap
             emojiRect.anchorMax = new Vector2(1f, 1.6f);
             emojiRect.offsetMin = emojiRect.offsetMax = Vector2.zero;
 
-            // Continuous approach: anchor Y lerps every frame from far (0.78) to adjacent (0.30)
-            // as the real-time approach timer progresses, so movement is visibly gradual rather
-            // than only jumping at the 3 discrete emoji-stage breakpoints.
-            const float farAnchorY = 0.78f;
-            const float adjacentAnchorY = 0.30f;
-
+            // Continuous approach: anchor Y lerps every frame from CombatConfig.enemyFarAnchorY to
+            // CombatConfig.enemyCollisionAnchorY as the real-time approach timer progresses, so
+            // movement is visibly gradual rather than only jumping at the 3 discrete emoji stages.
+            // Both anchors (and where the timer considers the enemy to have "reached" the player,
+            // i.e. when the game ends) are editable on the CombatConfig asset.
             combatManager.EnemyHPChanged += (current, max) =>
             {
                 float ratio = max <= 0f ? 0f : Mathf.Clamp01(current / max);
@@ -162,7 +161,7 @@ namespace LexiconLegends.Bootstrap
 
             combatManager.EnemyApproachProgressChanged += progress =>
             {
-                float anchorY = Mathf.Lerp(farAnchorY, adjacentAnchorY, progress);
+                float anchorY = Mathf.Lerp(combatConfig.enemyFarAnchorY, combatConfig.enemyCollisionAnchorY, progress);
                 var anchor = new Vector2(0.5f, anchorY);
                 enemyBodyRect.anchorMin = anchor;
                 enemyBodyRect.anchorMax = anchor;

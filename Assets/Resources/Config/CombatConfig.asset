@@ -19,3 +19,5 @@ MonoBehaviour:
   staggerTimeBonusSeconds: 5
   stage1Fraction: 0.33
   stage2Fraction: 0.66
+  enemyFarAnchorY: 0.78
+  enemyCollisionAnchorY: 0.3

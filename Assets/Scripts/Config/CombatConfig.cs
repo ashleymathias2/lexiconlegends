@@ -29,5 +29,11 @@ namespace LexiconLegends.Config
         [Header("Emoji/Proximity Stage Breakpoints (fractions of the approach timer elapsed)")]
         [Range(0f, 1f)] public float stage1Fraction = 0.33f;
         [Range(0f, 1f)] public float stage2Fraction = 0.66f;
+
+        [Header("Enemy Visual Position (anchor Y within the enemy zone, 0 = bottom, 1 = top)")]
+        [Tooltip("Where the enemy starts, at 0% approach progress.")]
+        [Range(0f, 1f)] public float enemyFarAnchorY = 0.78f;
+        [Tooltip("Where the enemy visually collides with the player, at 100% approach progress (this is when the game ends).")]
+        [Range(0f, 1f)] public float enemyCollisionAnchorY = 0.30f;
     }
 }
