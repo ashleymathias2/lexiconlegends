@@ -26,6 +26,7 @@ namespace LexiconLegends.Bootstrap
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
+            Time.timeScale = 1f; // Time.timeScale persists across scene loads, so guard against restarting into a paused-looking scene.
             EnsureEventSystem();
 
             // Loaded from Assets/Resources/Config/*.asset so every tunable number is visible
@@ -363,7 +364,7 @@ namespace LexiconLegends.Bootstrap
                 titleLabel.text = title;
                 actionLabel.text = "Restart";
                 actionButton.onClick.RemoveAllListeners();
-                actionButton.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex));
+                actionButton.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().name));
                 overlayGo.SetActive(true);
             }
 
