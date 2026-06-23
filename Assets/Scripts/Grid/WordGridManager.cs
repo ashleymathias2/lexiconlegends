@@ -170,6 +170,19 @@ namespace LexiconLegends.Grid
             SetFeedback(string.Empty);
         }
 
+        /// <summary>In-place restart for a new run: fresh board (new seed word, new letters), cleared selection/state, input re-enabled.</summary>
+        public void RestartBoard()
+        {
+            foreach (var tile in _selectionOrder) tile.SetSelected(false);
+            _selectionOrder.Clear();
+            _pendingRewardLetters = 0;
+            SetInputEnabled(true);
+
+            GenerateInitialBoard();
+            UpdatePreview();
+            SetFeedback(string.Empty);
+        }
+
         public void Reshuffle()
         {
             if (!_inputEnabled) return;

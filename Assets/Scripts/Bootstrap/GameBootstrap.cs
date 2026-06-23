@@ -7,7 +7,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace LexiconLegends.Bootstrap
@@ -364,7 +363,18 @@ namespace LexiconLegends.Bootstrap
                 titleLabel.text = title;
                 actionLabel.text = "Restart";
                 actionButton.onClick.RemoveAllListeners();
-                actionButton.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().name));
+                actionButton.onClick.AddListener(() =>
+                {
+                    // In-place restart rather than a scene reload: this prototype's scene was
+                    // never added to Build Settings, and SceneManager.LoadScene silently fails
+                    // (in both Editor Play mode and builds) for any scene not registered there.
+                    Time.timeScale = 1f;
+                    overlayGo.SetActive(false);
+                    livesRemaining = combatConfig.startingLives;
+                    livesLabel.text = $"Lives: {livesRemaining}";
+                    combatManager.Init(combatConfig);
+                    gridManager.RestartBoard();
+                });
                 overlayGo.SetActive(true);
             }
 
@@ -376,6 +386,7 @@ namespace LexiconLegends.Bootstrap
                 actionButton.onClick.RemoveAllListeners();
                 actionButton.onClick.AddListener(() =>
                 {
+                    Time.timeScale = 1f;
                     overlayGo.SetActive(false);
                     gridManager.SetInputEnabled(true);
                     combatManager.Init(combatConfig);
