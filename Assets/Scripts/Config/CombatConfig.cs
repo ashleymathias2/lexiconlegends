@@ -30,10 +30,17 @@ namespace LexiconLegends.Config
         [Range(0f, 1f)] public float stage1Fraction = 0.33f;
         [Range(0f, 1f)] public float stage2Fraction = 0.66f;
 
+        [Header("Enemy Visual Size")]
+        [Tooltip("Width/height of the enemy body box, in canvas reference units.")]
+        [Min(10f)] public float enemyBodySize = 220f;
+
         [Header("Enemy Visual Position (anchor Y within the enemy zone, 0 = bottom, 1 = top)")]
         [Tooltip("Where the enemy starts, at 0% approach progress.")]
         [Range(0f, 1f)] public float enemyFarAnchorY = 0.78f;
-        [Tooltip("Where the enemy visually collides with the player, at 100% approach progress (this is when the game ends).")]
-        [Range(0f, 1f)] public float enemyCollisionAnchorY = 0.30f;
+        [Tooltip("Anchor Y where the enemy's CENTER sits at 100% approach progress (this is when the game ends). " +
+            "Default (0.153) is calculated so the enemy body's bottom edge lands exactly on the HUD strip's top " +
+            "edge — i.e. the enemy visually touches the HUD rectangle when it kills the player. If you change " +
+            "enemyBodySize or the zone height split in GameBootstrap, recompute: 0.5 * enemyBodySize / enemyZoneHeightInRefUnits.")]
+        [Range(0f, 1f)] public float enemyCollisionAnchorY = 0.153f;
     }
 }

@@ -137,7 +137,7 @@ namespace LexiconLegends.Bootstrap
             var enemyBody = new GameObject("EnemyBody", typeof(RectTransform));
             enemyBody.transform.SetParent(zone, false);
             var enemyBodyRect = enemyBody.GetComponent<RectTransform>();
-            enemyBodyRect.sizeDelta = new Vector2(220, 220);
+            enemyBodyRect.sizeDelta = new Vector2(combatConfig.enemyBodySize, combatConfig.enemyBodySize);
             enemyBodyRect.anchorMin = enemyBodyRect.anchorMax = new Vector2(0.5f, combatConfig.enemyFarAnchorY);
             enemyBody.AddComponent<Image>().color = new Color(0.6f, 0.1f, 0.6f);
 
