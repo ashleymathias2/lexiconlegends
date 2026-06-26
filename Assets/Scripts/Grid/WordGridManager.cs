@@ -240,22 +240,10 @@ namespace LexiconLegends.Grid
                 _pendingRewardLetters += _spawnConfig.largeWordRewardLetterCount;
 
             var result = _combatResolver.ResolveCast(word);
-            SetFeedback(FormatCastFeedback(result));
+            SetFeedback(string.Empty); // Damage breakdown intentionally not shown on screen; see the floating number beside the enemy instead.
             SpellCast?.Invoke(result);
 
             DestroySelectedAndRefill();
-        }
-
-        private static string FormatCastFeedback(SpellCastResult result)
-        {
-            string extra = result.SpellType switch
-            {
-                SpellType.Restoration => $" (+{result.HealAmount:F1} heal)",
-                SpellType.Burn => $" (+{result.BurnTickDamage:F1}/turn x{result.BurnDurationTurns})",
-                SpellType.Stagger => " (pushes Aggression Meter back)",
-                _ => string.Empty
-            };
-            return $"\"{result.Word}\" → {result.SpellType}: {result.Damage:F1} dmg{extra} | combo x{result.ComboMultiplier:F2} (streak {result.StreakAtCast})";
         }
 
         private void FlashSelection()

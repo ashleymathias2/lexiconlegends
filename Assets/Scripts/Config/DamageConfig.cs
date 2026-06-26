@@ -39,10 +39,6 @@ namespace LexiconLegends.Config
         [Range(0f, 1f)] public float consonantCategoryThreshold = 0.6f;
         public string vowels = "AEIOU";
 
-        [Header("Restoration")]
-        [Tooltip("Portion of the word's damage value converted to player healing.")]
-        [Range(0f, 1f)] public float restorationHealRatio = 0.5f;
-
         [Header("Burn")]
         [Min(1)] public int burnDurationTurns = 3;
         [Tooltip("Portion of the word's damage value applied per burn tick.")]

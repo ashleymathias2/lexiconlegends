@@ -23,12 +23,11 @@ namespace LexiconLegends.Combat
                 out float lengthMultiplier, out float averageRarityWeight);
             var spellType = SpellResolver.DetermineSpellType(word, _config);
 
-            float healAmount = spellType == SpellType.Restoration ? damage * _config.restorationHealRatio : 0f;
             float burnTickDamage = spellType == SpellType.Burn ? damage * _config.burnTickDamageRatio : 0f;
             int burnDuration = spellType == SpellType.Burn ? _config.burnDurationTurns : 0;
 
             return new SpellCastResult(word, lengthMultiplier, averageRarityWeight, comboMultiplier,
-                streak, damage, spellType, healAmount, burnTickDamage, burnDuration);
+                streak, damage, spellType, burnTickDamage, burnDuration);
         }
     }
 }

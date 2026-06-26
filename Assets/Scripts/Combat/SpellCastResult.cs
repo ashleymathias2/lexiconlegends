@@ -1,6 +1,6 @@
 namespace LexiconLegends.Combat
 {
-    /// <summary>Full breakdown of a single word's cast, for display and (in Stage 4) application to combat.</summary>
+    /// <summary>Full breakdown of a single word's cast, for application to combat.</summary>
     public readonly struct SpellCastResult
     {
         public readonly string Word;
@@ -10,13 +10,12 @@ namespace LexiconLegends.Combat
         public readonly int StreakAtCast;
         public readonly float Damage;
         public readonly SpellType SpellType;
-        public readonly float HealAmount;
         public readonly float BurnTickDamage;
         public readonly int BurnDurationTurns;
 
         public SpellCastResult(string word, float lengthMultiplier, float averageRarityWeight,
             float comboMultiplier, int streakAtCast, float damage, SpellType spellType,
-            float healAmount, float burnTickDamage, int burnDurationTurns)
+            float burnTickDamage, int burnDurationTurns)
         {
             Word = word;
             LengthMultiplier = lengthMultiplier;
@@ -25,7 +24,6 @@ namespace LexiconLegends.Combat
             StreakAtCast = streakAtCast;
             Damage = damage;
             SpellType = spellType;
-            HealAmount = healAmount;
             BurnTickDamage = burnTickDamage;
             BurnDurationTurns = burnDurationTurns;
         }

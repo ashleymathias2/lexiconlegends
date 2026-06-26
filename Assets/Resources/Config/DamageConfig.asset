@@ -37,6 +37,5 @@ MonoBehaviour:
   vowelCategoryThreshold: 0.6
   consonantCategoryThreshold: 0.6
   vowels: AEIOU
-  restorationHealRatio: 0.5
   burnDurationTurns: 3
   burnTickDamageRatio: 0.15

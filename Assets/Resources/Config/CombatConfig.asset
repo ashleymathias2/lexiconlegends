@@ -12,7 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43f583f3ea3cdb24f8d1695c3a9db49f, type: 3}
   m_Name: CombatConfig
   m_EditorClassIdentifier:
-  playerMaxHP: 100
   enemyMaxHP: 50
   startingLives: 0
   timeToReachPlayerSeconds: 60
@@ -20,5 +19,7 @@ MonoBehaviour:
   stage1Fraction: 0.33
   stage2Fraction: 0.66
   enemyBodySize: 220
+  damagePopupLifetimeSeconds: 1.5
+  damagePopupRiseDistance: 60
   enemyFarAnchorY: 0.78
   enemyCollisionAnchorY: 0.153

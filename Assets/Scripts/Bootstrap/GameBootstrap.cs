@@ -13,10 +13,11 @@ namespace LexiconLegends.Bootstrap
 {
     /// <summary>
     /// Builds the playtest scene entirely at runtime: the three-zone portrait layout from
-    /// GDD Section 2 — a functional enemy zone (combat presentation), a full HUD strip
-    /// (player HP, combo streak, lives, pause, score), and the fully functional word grid
-    /// zone. This means pressing Play in any scene is enough to test — no manual
-    /// prefab/scene wiring required.
+    /// GDD Section 2 — a functional enemy zone (HP bar, movement, emoji, floating damage
+    /// numbers), a HUD strip (combo streak, pause, score), and the fully functional word
+    /// grid zone. This means pressing Play in any scene is enough to test — no manual
+    /// prefab/scene wiring required. No player HP/lives UI per project direction (see
+    /// CombatManager and BuildEndOfRunFlow).
     /// </summary>
     public static class GameBootstrap
     {
@@ -48,8 +49,8 @@ namespace LexiconLegends.Bootstrap
             var canvas = BuildCanvas();
             BuildEnemyZone(canvas.transform, combatManager, combatConfig);
             var manager = BuildGridZone(canvas.transform, config, spawnConfig, damageConfig, dictionary);
-            var livesLabel = BuildHudStrip(canvas.transform, combatManager, manager, damageConfig);
-            BuildEndOfRunFlow(canvas.transform, combatManager, manager, combatConfig, livesLabel);
+            BuildHudStrip(canvas.transform, combatManager, manager, damageConfig);
+            BuildEndOfRunFlow(canvas.transform, combatManager, manager, combatConfig);
 
             manager.SpellCast += combatManager.OnSpellCast;
         }
@@ -177,14 +178,26 @@ namespace LexiconLegends.Bootstrap
                     _ => string.Empty
                 };
             };
+
+            // Floating damage number beside the enemy, replacing any on-screen damage-formula
+            // breakdown: appears on every hit (cast damage or burn tick), drifts up, fades out.
+            var popupTemplate = CreateLabel(zone, string.Empty, 40, new Color(1f, 0.9f, 0.2f));
+            popupTemplate.rectTransform.anchorMin = new Vector2(0.62f, 0.7f);
+            popupTemplate.rectTransform.anchorMax = new Vector2(0.95f, 0.85f);
+            popupTemplate.rectTransform.offsetMin = popupTemplate.rectTransform.offsetMax = Vector2.zero;
+            popupTemplate.gameObject.SetActive(false);
+
+            combatManager.EnemyDamaged += amount =>
+                DamagePopup.Spawn(zone, popupTemplate, amount, combatConfig.damagePopupLifetimeSeconds, combatConfig.damagePopupRiseDistance);
         }
 
         // ---------------------------------------------------------------
-        // HUD strip (Section 2 middle zone): player HP, combo streak,
-        // lives, pause, level/score.
+        // HUD strip (Section 2 middle zone): combo streak, pause, level/score.
+        // Player HP and lives are not shown (per project direction — no player HP, and lives
+        // is unused at startingLives = 0; re-add the lives label here if startingLives > 0).
         // ---------------------------------------------------------------
 
-        private static TextMeshProUGUI BuildHudStrip(Transform canvasTransform, CombatManager combatManager,
+        private static void BuildHudStrip(Transform canvasTransform, CombatManager combatManager,
             WordGridManager gridManager, DamageConfig damageConfig)
         {
             // GDD Section 2: Middle zone, ~10% height.
@@ -197,41 +210,12 @@ namespace LexiconLegends.Bootstrap
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = true;
 
-            // Player HP: compact bar + numeric label, same pattern as the enemy HP bar.
-            var hpContainer = new GameObject("PlayerHp", typeof(RectTransform));
-            hpContainer.transform.SetParent(zone, false);
-            hpContainer.AddComponent<LayoutElement>().flexibleWidth = 1.4f;
-            hpContainer.AddComponent<Image>().color = new Color(0.1f, 0.05f, 0.05f);
-
-            var hpFillGo = new GameObject("Fill", typeof(RectTransform));
-            hpFillGo.transform.SetParent(hpContainer.transform, false);
-            var hpFillRect = hpFillGo.GetComponent<RectTransform>();
-            hpFillRect.anchorMin = Vector2.zero;
-            hpFillRect.anchorMax = Vector2.one;
-            hpFillRect.offsetMin = hpFillRect.offsetMax = Vector2.zero;
-            hpFillRect.pivot = new Vector2(0f, 0.5f);
-            hpFillGo.AddComponent<Image>().color = new Color(0.2f, 0.75f, 0.3f);
-
-            var hpLabel = CreateLabel(hpContainer.transform, "HP 100/100", 22, Color.white);
-            StretchFull(hpLabel.rectTransform);
-
-            combatManager.PlayerHPChanged += (current, max) =>
-            {
-                float ratio = max <= 0f ? 0f : Mathf.Clamp01(current / max);
-                hpFillRect.anchorMax = new Vector2(ratio, 1f);
-                hpLabel.text = $"HP {Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)}";
-            };
-
             // Combo streak.
             var comboLabel = CreateLabel(zone, "Streak: 0", 22, Color.white);
             comboLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             var comboDisplay = comboLabel.gameObject.AddComponent<ComboStreakDisplay>();
             comboDisplay.Init(comboLabel, damageConfig.streakResetSeconds);
             gridManager.SpellCast += result => comboDisplay.RegisterStreak(result.StreakAtCast);
-
-            // Lives.
-            var livesLabel = CreateLabel(zone, string.Empty, 22, Color.white);
-            livesLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
             // Level/score: score tracked as cumulative damage dealt to the current enemy.
             var scoreLabel = CreateLabel(zone, "Score: 0  |  Lvl 1", 22, Color.white);
@@ -256,8 +240,6 @@ namespace LexiconLegends.Bootstrap
                 gridManager.SetInputEnabled(!isPaused);
                 pauseLabel.text = isPaused ? "Resume" : "Pause";
             });
-
-            return livesLabel;
         }
 
         // ---------------------------------------------------------------
@@ -281,7 +263,7 @@ namespace LexiconLegends.Bootstrap
             var previewLabel = CreateLabel(zone, "—", 48, Color.white);
             previewLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
 
-            // Feedback row (validation messages + cast breakdown).
+            // Feedback row (validation messages only — damage breakdown is intentionally not shown here).
             var feedbackLabel = CreateLabel(zone, string.Empty, 24, new Color(1f, 0.8f, 0.4f));
             feedbackLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 80;
 
@@ -325,14 +307,15 @@ namespace LexiconLegends.Bootstrap
         // End-of-run flow: win/loss overlay, plus a minimal lives counter
         // (full lives economy — refill timers, IAP — is Section 8, out of scope).
         // Losing to the enemy reaching the player costs a life and continues
-        // (fresh enemy HP and approach timer) until lives run out.
+        // (fresh enemy HP and approach timer) until lives run out. No lives UI is shown
+        // while startingLives = 0 (its default); add a HUD label back here if it's raised
+        // above 0 and the remaining-lives count needs to be visible during a run.
         // ---------------------------------------------------------------
 
         private static void BuildEndOfRunFlow(Transform canvasTransform, CombatManager combatManager,
-            WordGridManager gridManager, CombatConfig combatConfig, TextMeshProUGUI livesLabel)
+            WordGridManager gridManager, CombatConfig combatConfig)
         {
             int livesRemaining = combatConfig.startingLives;
-            livesLabel.text = $"Lives: {livesRemaining}";
 
             var overlayGo = new GameObject("EndOfRunOverlay", typeof(RectTransform));
             overlayGo.transform.SetParent(canvasTransform, false);
@@ -370,7 +353,6 @@ namespace LexiconLegends.Bootstrap
                     Time.timeScale = 1f;
                     overlayGo.SetActive(false);
                     livesRemaining = combatConfig.startingLives;
-                    livesLabel.text = $"Lives: {livesRemaining}";
                     combatManager.Init(combatConfig);
                     gridManager.RestartBoard();
                 });
@@ -397,7 +379,6 @@ namespace LexiconLegends.Bootstrap
             combatManager.PlayerDefeated += () =>
             {
                 livesRemaining = Mathf.Max(0, livesRemaining - 1);
-                livesLabel.text = $"Lives: {livesRemaining}";
 
                 if (livesRemaining > 0) ShowContinueOverlay();
                 else ShowFinalOverlay("You Lose...");
