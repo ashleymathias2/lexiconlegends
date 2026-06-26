@@ -56,7 +56,7 @@ namespace LexiconLegends.EditorTools
             }
 
             if (File.Exists(zipPath)) File.Delete(zipPath);
-            ZipFile.CreateFromDirectory(outputPath, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+            ZipFile.CreateFromDirectory(outputPath, zipPath, System.IO.Compression.CompressionLevel.Optimal, includeBaseDirectory: false);
 
             Debug.Log($"Lexicon Legends WebGL build succeeded.\nFolder: {outputPath}\nZip (upload this to itch.io): {zipPath}");
         }
