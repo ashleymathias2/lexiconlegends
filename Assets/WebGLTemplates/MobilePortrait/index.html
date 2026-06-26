@@ -8,10 +8,10 @@
     <style>
       /*
         Always renders the game in a portrait mobile aspect ratio, regardless of the
-        device or browser window it's opened in -- on desktop this letterboxes/pillarboxes
-        the canvas inside the browser window rather than stretching it to fill a wide
-        landscape window; on phones it fills the screen because phone viewports are
-        already close to this aspect ratio.
+        device/browser/host-page it's opened in. Uses native CSS (aspect-ratio +
+        object-fit: contain) instead of JS-measured pixel math, so there's no race
+        against a host page's (e.g. itch.io's embed wrapper) own UI chrome finishing
+        layout late, and no dependency on "resize" events firing at the right time.
       */
       html, body {
         height: 100%;
@@ -29,6 +29,10 @@
         justify-content: center;
       }
       #unity-canvas {
+        width: 100%;
+        height: 100%;
+        aspect-ratio: {{{ WIDTH }}} / {{{ HEIGHT }}};
+        object-fit: contain;
         background: {{{ BACKGROUND_FILENAME ? 'url(\'Build/' + BACKGROUND_FILENAME.replace(/'/g, '%27') + '\') center / cover' : BACKGROUND_COLOR }}};
       }
     </style>
@@ -39,49 +43,7 @@
     </div>
     <script src="Build/{{{ LOADER_FILENAME }}}"></script>
     <script>
-      // Portrait aspect ratio to lock to, taken from the build's own declared canvas size
-      // (Player Settings > Resolution and Presentation > Default Canvas Width/Height).
-      var ASPECT_W = {{{ WIDTH }}};
-      var ASPECT_H = {{{ HEIGHT }}};
-      var canvas = document.querySelector("#unity-canvas");
-
-      function resizeCanvasToAspectRatio() {
-        var windowW = window.innerWidth;
-        var windowH = window.innerHeight;
-        var targetAspect = ASPECT_W / ASPECT_H;
-        var windowAspect = windowW / windowH;
-
-        var displayW, displayH;
-        if (windowAspect > targetAspect) {
-          // Window is relatively wider than the target portrait shape: fit to height, pillarbox sides.
-          displayH = windowH;
-          displayW = displayH * targetAspect;
-        } else {
-          // Window is relatively taller/narrower: fit to width, letterbox top/bottom.
-          displayW = windowW;
-          displayH = displayW / targetAspect;
-        }
-
-        canvas.style.width = displayW + "px";
-        canvas.style.height = displayH + "px";
-      }
-
-      window.addEventListener("resize", resizeCanvasToAspectRatio);
-      window.addEventListener("orientationchange", resizeCanvasToAspectRatio);
-
-      // Host pages (e.g. itch.io's embed wrapper) sometimes finish laying out their own
-      // UI chrome (toolbars, fullscreen buttons) slightly after this script first runs,
-      // without firing a window "resize" event. A ResizeObserver on the body catches those
-      // layout shifts directly; the timeouts are a fallback for browsers without it.
-      resizeCanvasToAspectRatio();
-      setTimeout(resizeCanvasToAspectRatio, 300);
-      setTimeout(resizeCanvasToAspectRatio, 1000);
-
-      if (window.ResizeObserver) {
-        new ResizeObserver(resizeCanvasToAspectRatio).observe(document.body);
-      }
-
-      createUnityInstance(canvas, {
+      createUnityInstance(document.querySelector("#unity-canvas"), {
         arguments: [],
         dataUrl: "Build/{{{ DATA_FILENAME }}}",
         frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
