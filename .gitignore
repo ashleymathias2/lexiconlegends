@@ -6,6 +6,8 @@
 /[Ll]ogs/
 /[Mm]emoryCaptures/
 /[Uu]ser[Ss]ettings/
+/Assets/_Recovery/
+/Assets/_Recovery.meta
 
 *.csproj
 *.unityproj

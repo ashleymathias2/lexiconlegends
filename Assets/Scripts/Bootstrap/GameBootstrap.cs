@@ -396,7 +396,7 @@ namespace LexiconLegends.Bootstrap
             combatManager.EnemyDefeated += () => ShowFinalOverlay("You Win!");
             combatManager.PlayerDefeated += () =>
             {
-                livesRemaining--;
+                livesRemaining = Mathf.Max(0, livesRemaining - 1);
                 livesLabel.text = $"Lives: {livesRemaining}";
 
                 if (livesRemaining > 0) ShowContinueOverlay();

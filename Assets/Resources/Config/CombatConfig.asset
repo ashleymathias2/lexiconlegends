@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   playerMaxHP: 100
   enemyMaxHP: 50
-  startingLives: 3
+  startingLives: 0
   timeToReachPlayerSeconds: 60
   staggerTimeBonusSeconds: 5
   stage1Fraction: 0.33
