@@ -67,7 +67,19 @@
       }
 
       window.addEventListener("resize", resizeCanvasToAspectRatio);
+      window.addEventListener("orientationchange", resizeCanvasToAspectRatio);
+
+      // Host pages (e.g. itch.io's embed wrapper) sometimes finish laying out their own
+      // UI chrome (toolbars, fullscreen buttons) slightly after this script first runs,
+      // without firing a window "resize" event. A ResizeObserver on the body catches those
+      // layout shifts directly; the timeouts are a fallback for browsers without it.
       resizeCanvasToAspectRatio();
+      setTimeout(resizeCanvasToAspectRatio, 300);
+      setTimeout(resizeCanvasToAspectRatio, 1000);
+
+      if (window.ResizeObserver) {
+        new ResizeObserver(resizeCanvasToAspectRatio).observe(document.body);
+      }
 
       createUnityInstance(canvas, {
         arguments: [],
