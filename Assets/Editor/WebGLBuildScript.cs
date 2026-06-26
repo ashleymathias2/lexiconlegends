@@ -27,11 +27,14 @@ namespace LexiconLegends.EditorTools
             PlayerSettings.defaultScreenWidth = 540;
             PlayerSettings.defaultScreenHeight = 960;
 
-            // Built-in "Minimal" WebGL template: on phones it already stretches the canvas to
-            // fill the browser viewport and sets a no-zoom mobile viewport meta tag, and the
-            // WebGL canvas forwards browser touch events to Unity's input system automatically
-            // — no extra touch-input wiring needed for this to work in a phone browser.
-            PlayerSettings.WebGL.template = "APPLICATION:Minimal";
+            // Custom MobilePortrait template (Assets/WebGLTemplates/MobilePortrait): locks the
+            // canvas to this build's portrait aspect ratio on EVERY device, not just phones —
+            // the built-in "Minimal" template only forces mobile-style sizing when it detects a
+            // phone user-agent, so on desktop it rendered at a small fixed box instead of a
+            // mobile-shaped frame. This template always letterboxes/pillarboxes to the aspect
+            // ratio instead. Touch events are still forwarded to Unity's input system
+            // automatically by the WebGL canvas — no extra wiring needed for that part.
+            PlayerSettings.WebGL.template = "PROJECT:MobilePortrait";
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
 
             string projectRoot = Directory.GetParent(Application.dataPath)!.FullName;
