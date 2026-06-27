@@ -9,6 +9,13 @@
 /Assets/_Recovery/
 /Assets/_Recovery.meta
 
+# Embedded/resolved packages: only manifest.json and packages-lock.json declare
+# dependencies and need to be committed -- Package Manager re-resolves the actual
+# package content (including any vendored third-party binaries) on its own.
+/Packages/*/
+!/Packages/manifest.json
+!/Packages/packages-lock.json
+
 *.csproj
 *.unityproj
 *.sln
